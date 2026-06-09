@@ -1,8 +1,10 @@
 # WeChat Bot Runtime Fixer
 
-A Codex skill for diagnosing and fixing Python WeChat bot runtime issues around media delivery, voice replies, config editors, and user-facing verification.
+A portable skill pack for diagnosing and fixing Python WeChat bot runtime issues around media delivery, voice replies, config editors, and user-facing verification.
 
-This skill was distilled from real debugging patterns: placeholder messages that never become images, voice previews that bypass generation toggles, per-user voice settings that drift away from chat routing, and send flows that look correct internally but fail in the final WeChat result.
+It includes a Codex-compatible `SKILL.md`, plus a README, playbooks, and a static diagnostic script that other AI coding assistants can also use as reference material.
+
+This pack was distilled from real debugging patterns: placeholder messages that never become images, voice previews that bypass generation toggles, per-user voice settings that drift away from chat routing, and send flows that look correct internally but fail in the final WeChat result.
 
 ## What It Helps Fix
 
@@ -51,11 +53,13 @@ Copy-Item -Recurse -Force .\wechat-bot-runtime-fixer "$env:USERPROFILE\.codex\sk
 
 ## Usage
 
-Ask Codex to use the skill:
+Ask your assistant to use the skill:
 
 ```text
 Use $wechat-bot-runtime-fixer to diagnose why my WeChat bot only sends [拍照] instead of an image.
 ```
+
+The same prompt pattern works well in Codex, ChatGPT, and other coding assistants that can read repository files or follow a prompt-based skill pack.
 
 Or run the bundled static diagnostic script from your bot repository:
 
@@ -99,14 +103,15 @@ Use $wechat-bot-runtime-fixer to align per-user voice mapping with LISTEN_LIST.
 - The diagnostic script is read-only.
 - No private keys, tokens, user names, or machine paths are included.
 - Licensed under MIT. See [`LICENSE`](LICENSE).
+- The Codex `SKILL.md` is the only Codex-specific file; the rest of the pack is designed to be useful in other AI coding tools too.
 
 ---
 
-# 微信机器人运行时修复 Skill
+# 微信机器人运行时修复包
 
-这是一个给 Codex 使用的 skill，用来诊断和修复 Python 微信机器人里的运行时问题，重点覆盖图片发送、语音回复、配置页、预览接口，以及最终用户在微信里真正看到的结果。
+这是一个可复用的技能包，既能给 Codex 用，也适合其他 AI 编程助手参考。它用来诊断和修复 Python 微信机器人里的运行时问题，重点覆盖图片发送、语音回复、配置页、预览接口，以及最终用户在微信里真正看到的结果。
 
-这个 skill 来自真实项目排错经验：例如占位符没有变成图片、上传音色预览绕过开关、按用户配置的语音映射变成固定角色列表、内部日志看似成功但微信里没有真正发出文件等。
+这个包来自真实项目排错经验：例如占位符没有变成图片、上传音色预览绕过开关、按用户配置的语音映射变成固定角色列表、内部日志看似成功但微信里没有真正发出文件等。
 
 ## 能解决什么
 
@@ -155,11 +160,13 @@ Copy-Item -Recurse -Force .\wechat-bot-runtime-fixer "$env:USERPROFILE\.codex\sk
 
 ## 使用方法
 
-让 Codex 使用这个 skill：
+让你的助手使用这个 skill：
 
 ```text
 Use $wechat-bot-runtime-fixer to diagnose why my WeChat bot only sends [拍照] instead of an image.
 ```
+
+这个写法对 Codex、ChatGPT，以及其他能读取仓库文件或跟随技能说明的编程助手都比较通用。
 
 也可以在机器人项目根目录运行静态诊断脚本：
 
