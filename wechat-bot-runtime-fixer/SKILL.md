@@ -1,11 +1,11 @@
 ---
 name: wechat-bot-runtime-fixer
-description: Diagnose and fix Python WeChat bot runtime issues. Use when working in a repo with bot.py, config.py, config_editor.py, voice_profile.py, image_generation.py, LISTEN_LIST, wx.SendFiles, uploaded voice generation, config editor previews, WeChat message sending, or symptoms like only sending [photo] placeholders, voice preview bypassing toggles, per-user voice mappings looking fixed, or generated media not reaching WeChat.
+description: Diagnose and fix Python chat or messaging bot runtime issues. Use when working in a repo with bot.py, config.py, config_editor.py, voice_profile.py, image_generation.py, user-routing lists, send-file primitives, uploaded voice generation, config editor previews, chat message sending, or symptoms like only sending placeholders, voice preview bypassing toggles, per-user mappings looking fixed, or generated media not reaching the chat app. WeChat-specific file and command names are used as reference patterns.
 ---
 
-# WeChat Bot Runtime Fixer
+# Chat Bot Runtime Fixer
 
-Use this skill to turn WeChat bot complaints into working user-facing behavior. The goal is not a clean log line; the goal is the actual sent text, image, audio, preview, or saved config that the user sees.
+Use this skill to turn chat-bot complaints into working user-facing behavior. The goal is not a clean log line; the goal is the actual sent text, image, audio, preview, or saved config that the user sees.
 
 ## First Move
 
@@ -19,26 +19,26 @@ Use the output as a triage map, not as final truth. Then inspect the named files
 
 ## Workflow
 
-1. Start from the visible symptom: what did WeChat, the config page, or the preview endpoint actually do?
+1. Start from the visible symptom: what did the chat app, the config page, or the preview endpoint actually do?
 2. Trace ingress: user message, model placeholder, config form/API, web preview, timer, or automation probe.
-3. Trace delivery: `wx.SendFiles()`, text send, generated audio file, generated image file, config save, or browser preview response.
+3. Trace delivery: the app's send-file primitive, text send, generated audio file, generated image file, config save, or browser preview response.
 4. Fix all coupled layers in one pass. Trigger words plus placeholder parsing plus file send are one bug class; runtime synthesis plus web preview toggle behavior is another.
-5. Verify the user-facing surface when available. If WeChat, browser, or local synthesis services are unavailable, report the exact verification boundary and the lower-level checks that passed.
+5. Verify the user-facing surface when available. If the chat app, browser, or local synthesis services are unavailable, report the exact verification boundary and the lower-level checks that passed.
 
 ## Issue Playbooks
 
 Load `references/wechat-bot-playbooks.md` when the task involves one of these areas:
 
-- Image generation sends `[photo]`, `[拍照]`, `[照片]`, or `【照片】(...)` as text.
-- Voice mapping must follow WeChat users rather than role/prompt-deduped rows.
+- Image generation sends placeholders as text instead of a real file.
+- Voice mapping must follow users rather than role/prompt-deduped rows.
 - Uploaded/custom voice generation or preview ignores `VOICE_REPLY_UPLOADED_GENERATION_ENABLED`.
 - Config editor defaults, form parsing, or preview routes diverge from runtime behavior.
 - Queue/send-flow errors risk losing messages or sending fallback notices outside the active send path.
 
 ## Non-Negotiables
 
-- Treat `LISTEN_LIST` as the per-chat source of truth for this bot style of routing.
-- Do not replace a real WeChat outcome with placeholder text, fake image tags, or audio path strings.
+- Treat the app's user list as the per-chat source of truth for this bot style of routing.
+- Do not replace a real chat-app outcome with placeholder text, fake image tags, or audio path strings.
 - Do not edit generated media, uploaded voices, memory folders, chat contexts, or user config broadly unless the user explicitly asks.
 - Prefer small code changes in existing helpers over new abstractions unless the bug spans repeated logic.
 - Explain root cause before the fix when the user asks why a visible behavior broke.

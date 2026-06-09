@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static WeChat bot repo diagnostics.
+"""Static chat bot repo diagnostics.
 
 This script intentionally does not import project modules. Bot config files can
 contain local secrets, side effects, or machine-specific paths, so diagnostics
@@ -153,8 +153,8 @@ def print_text(findings: list[Finding]) -> None:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Static diagnostics for Python WeChat bot repos.")
-    parser.add_argument("--repo", default=".", help="Path to the WeChat bot repo root")
+    parser = argparse.ArgumentParser(description="Static diagnostics for Python chat bot repos.")
+    parser.add_argument("--repo", default=".", help="Path to the chat bot repo root")
     parser.add_argument("--json", action="store_true", help="Emit JSON findings")
     args = parser.parse_args(argv)
 
