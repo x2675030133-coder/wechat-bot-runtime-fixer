@@ -98,6 +98,7 @@ Use $wechat-bot-runtime-fixer to align per-user voice mapping with LISTEN_LIST.
 - The skill is intentionally conservative: it prefers small fixes and explicit verification.
 - The diagnostic script is read-only.
 - No private keys, tokens, user names, or machine paths are included.
+- Licensed under MIT. See [`LICENSE`](LICENSE).
 
 ---
 
