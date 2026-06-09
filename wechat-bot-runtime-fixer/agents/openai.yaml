@@ -1,0 +1,4 @@
+interface:
+  display_name: "WeChat Bot Runtime Fixer"
+  short_description: "Fix WeChat bot voice, image, and config bugs."
+  default_prompt: "Use $wechat-bot-runtime-fixer to diagnose and fix a WeChat bot runtime issue."
