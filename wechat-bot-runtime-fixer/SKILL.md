@@ -34,6 +34,10 @@ Load `references/wechat-bot-playbooks.md` when the task involves one of these ar
 - Uploaded/custom voice generation or preview ignores `VOICE_REPLY_UPLOADED_GENERATION_ENABLED`.
 - Config editor defaults, form parsing, or preview routes diverge from runtime behavior.
 - Queue/send-flow errors risk losing messages or sending fallback notices outside the active send path.
+- The bot replies to itself or answers the same message twice (screen/OCR baseline drift or punctuation-jitter re-reads).
+- A generated reply never reaches the chat app (clipboard contention or automation fail-safe in the send driver).
+- Generated images look "too AI" because the full chat persona leaks into the image prompt.
+- The bot process died and the cause is not in any log (no file handler / uncaught-exception hooks).
 
 ## Non-Negotiables
 
@@ -52,6 +56,8 @@ python -m py_compile bot.py config.py config_editor.py voice_profile.py image_ge
 python -m pytest test_chat_response_utils.py test_config_editor_api_key_masking.py test_image_generation_fallback.py test_voice_bubble_probe.py
 python .agents/skills/wechat-bot-runtime-fixer/scripts/diagnose_wechat_bot.py --repo .
 ```
+
+When the send driver or listener changed, also compile them and run their echo-filter, baseline-recovery, and send-resilience tests. When the bot exited unexpectedly, read the persistent log file first (search CRITICAL or traceback) — uncaught-exception hooks land the death cause there.
 
 For UI/config work, also open the config editor in a browser and verify render shape, save behavior, and preview behavior.
 
