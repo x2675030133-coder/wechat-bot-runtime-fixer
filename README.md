@@ -14,6 +14,10 @@ This pack was distilled from real debugging patterns: placeholder messages that 
 - Uploaded/custom voice generation that ignores an enable/disable toggle.
 - Config editor defaults, preview routes, or save logic that diverge from runtime behavior.
 - Queue and send-flow bugs where messages can disappear after exceptions.
+- A bot that replies to itself or answers the same message twice (screen/OCR baseline drift or punctuation-jitter re-reads).
+- Generated replies that never reach the chat app due to clipboard contention or automation fail-safe on off-screen windows.
+- Generated images that look "too AI" because the full chat persona leaks into the image prompt.
+- A bot process that dies with no recorded cause (missing file handler and uncaught-exception hooks).
 
 ## What's Included
 
@@ -121,6 +125,10 @@ Use $wechat-bot-runtime-fixer to align per-user voice mapping with LISTEN_LIST.
 - 上传音色/自定义音色没有遵守生成开关。
 - 配置页默认值、预览接口、保存逻辑和运行时行为不一致。
 - 队列或发送流程异常时，消息可能丢失。
+- 机器人自己回复自己、或对同一条消息回复两次（屏幕/OCR 基线漂移，或标点抖动导致重读）。
+- 生成的回复因剪贴板争用、或窗口移出屏幕触发自动化 fail-safe 而没能发到聊天应用。
+- 生成的图片"太 AI 味"，因为整份聊天人设灌进了图片提示词。
+- 机器人进程崩溃却查不到死因（缺文件日志和未捕获异常钩子）。
 
 ## 包含内容
 
