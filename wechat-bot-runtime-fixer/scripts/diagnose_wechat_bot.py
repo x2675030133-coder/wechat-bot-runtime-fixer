@@ -68,6 +68,65 @@ def grep_context(text: str, pattern: str) -> str:
     return f"line {line_no}: {line[:180]}"
 
 
+# config.py is commonly read line-by-line with a regex like `^KEY\s*=\s*(.+)$` by BOTH the
+# config editor's parser and the bot's dynamic-config reader; `.` does not span lines. These
+# two static checks catch the most common, silently-broken config bug class in this bot shape.
+_TOP_LEVEL_ASSIGN = re.compile(r"^([A-Za-z_]\w*)\s*=")
+# A list/dict whose opening bracket is the last real content on the line => its value spans
+# multiple lines, so the parser reads only `[` or `{` and the real value is lost.
+_MULTILINE_OPENER = re.compile(r"^([A-Za-z_]\w*)\s*=\s*([\[{])\s*(#.*)?$")
+
+
+def check_config_parsing(config: str) -> list[Finding]:
+    findings: list[Finding] = []
+    if not config:
+        return findings
+
+    lines = config.splitlines()
+
+    # 1) Multi-line list/dict values (top-level / column 0 only — that is where config
+    #    settings live and what the line-based parser actually keys on).
+    multiline_hits: list[str] = []
+    for idx, line in enumerate(lines, start=1):
+        m = _MULTILINE_OPENER.match(line)
+        if m:
+            multiline_hits.append(f"line {idx}: {m.group(1)} = {m.group(2)} ...")
+    if multiline_hits:
+        findings.append(Finding(
+            "WARN", "config-parse",
+            "Multi-line list/dict in config.py will be misread by line-based parsers "
+            "(the editor parser and the bot's dynamic-config reader read only the first line "
+            f"-> value becomes '{multiline_hits and multiline_hits[0].split('= ')[-1].strip(' .')}'). "
+            "Collapse each to a single physical line.",
+            " | ".join(multiline_hits[:8]),
+        ))
+    else:
+        findings.append(Finding("OK", "config-parse", "No multi-line list/dict config values detected in config.py"))
+
+    # 2) Duplicate top-level KEY definitions. A re.search-based reader returns the FIRST
+    #    match, so a later "readable" redefinition can be silent dead code.
+    seen: dict[str, list[int]] = {}
+    for idx, line in enumerate(lines, start=1):
+        if line[:1].isspace():
+            continue  # only column-0 assignments are config settings
+        m = _TOP_LEVEL_ASSIGN.match(line)
+        if m:
+            seen.setdefault(m.group(1), []).append(idx)
+    dupes = {key: locs for key, locs in seen.items() if len(locs) > 1}
+    if dupes:
+        sample = "; ".join(f"{key} @ lines {locs}" for key, locs in list(dupes.items())[:6])
+        findings.append(Finding(
+            "WARN", "config-parse",
+            "Duplicate top-level definitions in config.py; a re.search-based reader returns the "
+            "FIRST match, so later redefinitions may be dead code. Keep one definition per key.",
+            sample,
+        ))
+    else:
+        findings.append(Finding("OK", "config-parse", "No duplicate top-level config keys detected in config.py"))
+
+    return findings
+
+
 def diagnose(repo: Path) -> list[Finding]:
     findings: list[Finding] = []
     files = {name: repo / name for name in CORE_FILES}
@@ -84,6 +143,9 @@ def diagnose(repo: Path) -> list[Finding]:
     editor = texts.get("config_editor.py", "")
     bot = texts.get("bot.py", "")
     voice = texts.get("voice_profile.py", "")
+
+    # Config parsing traps (the most common silent bug class in this bot shape).
+    findings.extend(check_config_parsing(config))
 
     if config and "LISTEN_LIST" in config:
         findings.append(Finding("OK", "routing", "config.py defines LISTEN_LIST", grep_context(config, r"LISTEN_LIST\s*=")))
