@@ -1,6 +1,6 @@
 ---
 name: wechat-bot-runtime-fixer
-description: Diagnose and fix Python chat or messaging bot runtime issues. Use when working in a repo with bot.py, config.py, config_editor.py, voice_profile.py, image_generation.py, user-routing lists, send-file primitives, uploaded voice generation, config editor previews, chat message sending, or symptoms like only sending placeholders, voice preview bypassing toggles, per-user mappings looking fixed, or generated media not reaching the chat app. WeChat-specific file and command names are used as reference patterns.
+description: Diagnose and fix Python chat or messaging bot runtime issues. Use when working with config editors, user routing, GUI/UIA/OCR listeners, media delivery, provider/model routing, or durable background work; especially for placeholder output, self-replies, dropped segments, ignored toggles, endpoint/model mismatches, or deferred work lost after interruption. WeChat names are reference patterns.
 ---
 
 # Chat Bot Runtime Fixer
@@ -36,6 +36,9 @@ Load `references/wechat-bot-playbooks.md` when the task involves one of these ar
 - Queue/send-flow errors risk losing messages or sending fallback notices outside the active send path.
 - The bot replies to itself or answers the same message twice (screen/OCR baseline drift or punctuation-jitter re-reads).
 - A generated reply never reaches the chat app (clipboard contention or automation fail-safe in the send driver).
+- A UIA/screen listener receives the bot's own text/image, starts beside fallback listeners, or trusts a stale current-chat/window cache.
+- A request retries the same deterministic 400 because model id, base URL, provider schema, or saved API key do not belong together.
+- Deferred background work disappears, duplicates, or remains stuck in `processing` after restart.
 - Generated images look "too AI" because the full chat persona leaks into the image prompt.
 - The bot process died and the cause is not in any log (no file handler / uncaught-exception hooks).
 
@@ -43,6 +46,7 @@ Load `references/wechat-bot-playbooks.md` when the task involves one of these ar
 
 - Treat the app's user list as the per-chat source of truth for this bot style of routing.
 - Do not replace a real chat-app outcome with placeholder text, fake image tags, or audio path strings.
+- Do not report a segment as sent or remove retryable work until the final send/handler returns success.
 - Do not edit generated media, uploaded voices, memory folders, chat contexts, or user config broadly unless the user explicitly asks.
 - Prefer small code changes in existing helpers over new abstractions unless the bug spans repeated logic.
 - Explain root cause before the fix when the user asks why a visible behavior broke.
@@ -57,7 +61,7 @@ python -m pytest test_chat_response_utils.py test_config_editor_api_key_masking.
 python .agents/skills/wechat-bot-runtime-fixer/scripts/diagnose_wechat_bot.py --repo .
 ```
 
-When the send driver or listener changed, also compile them and run their echo-filter, baseline-recovery, and send-resilience tests. When the bot exited unexpectedly, read the persistent log file first (search CRITICAL or traceback) — uncaught-exception hooks land the death cause there.
+When the send driver or listener changed, compile them and run echo-filter, baseline-recovery, send-resilience, and UIA/bubble-filter tests. For provider or durable-work changes, run model/backend and queue-restart tests. When the bot exited unexpectedly, read the persistent log file first (search CRITICAL or traceback) — uncaught-exception hooks land the death cause there.
 
 For UI/config work, also open the config editor in a browser and verify render shape, save behavior, and preview behavior.
 
