@@ -16,6 +16,9 @@ This pack was distilled from real debugging patterns: placeholder messages that 
 - Queue and send-flow bugs where messages can disappear after exceptions.
 - A bot that replies to itself or answers the same message twice (screen/OCR baseline drift or punctuation-jitter re-reads).
 - Generated replies that never reach the chat app due to clipboard contention or automation fail-safe on off-screen windows.
+- UIA receive paths that dispatch outgoing bubbles, duplicate fallback listeners, or trust a stale chat/window cache.
+- Provider/model tuples that retry deterministic endpoint, model, key, or request-schema errors.
+- Deferred memory or background work that is lost, duplicated, or stuck after restart.
 - Generated images that look "too AI" because the full chat persona leaks into the image prompt.
 - A bot process that dies with no recorded cause (missing file handler and uncaught-exception hooks).
 
@@ -127,6 +130,9 @@ Use $wechat-bot-runtime-fixer to align per-user voice mapping with LISTEN_LIST.
 - 队列或发送流程异常时，消息可能丢失。
 - 机器人自己回复自己、或对同一条消息回复两次（屏幕/OCR 基线漂移，或标点抖动导致重读）。
 - 生成的回复因剪贴板争用、或窗口移出屏幕触发自动化 fail-safe 而没能发到聊天应用。
+- UIA 接收链把自己发出的气泡当新消息、与兜底监听重复启动，或继续信任失效的聊天/窗口缓存。
+- 模型、服务地址、密钥或请求协议不匹配，却仍重复重试同一个确定性错误。
+- 记忆或后台任务在延后、失败或重启后丢失、重复，或永久卡在处理中。
 - 生成的图片"太 AI 味"，因为整份聊天人设灌进了图片提示词。
 - 机器人进程崩溃却查不到死因（缺文件日志和未捕获异常钩子）。
 

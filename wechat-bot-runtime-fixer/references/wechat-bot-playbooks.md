@@ -159,17 +159,20 @@ Two distinct root causes (both produce "bot replies to itself"; diagnose before 
 
 - **Scroll baseline drift.** File sends open a blunt echo-suppress window (within it, anything read back is judged self). Text sends historically relied only on a sent-text similarity cache (short TTL). That cache catches the bot's own bubble echo but *not* an old peer message that "revives" because fast scrolling moved the screen/OCR baseline. Across a multi-segment burst, early segments also age out of the cache TTL.
 - **Punctuation-jitter re-read.** The same peer bubble gets read twice seconds apart with only punctuation differing (e.g. full-width vs half-width brackets), so it passes both overlap matching and fingerprint dedup as a "new" message and the bot answers twice. Tell: the bubble is correctly classified as peer (self-detection is not the problem — tuning that threshold does nothing).
+- **UIA echo race.** UIA sees outgoing bubbles immediately. A broad quiet window can swallow real incoming messages, while arming a file marker after paste is too late to stop the outgoing image placeholder from being dispatched.
 
 Fix pattern:
 
 - Refresh the echo-suppress window on **every** text send (not just file sends), so each burst segment extends it. If both send paths converge on one "record sent text" point, fix it there once.
 - Keep the listener's text-normalization stripping the *same* punctuation/bracket/quote set as the send driver's normalization. One aligned change closes both overlap matching and fingerprint dedup.
 - The suppress window is deliberately blunter than similarity matching — that is the point; it stops drift phantoms the cache cannot.
+- For UIA, use exact normalized sent-text matches instead of the OCR quiet window. Arm one outgoing file/image echo before clipboard paste and consume it only for the expected image placeholder type.
+- In automatic receive mode, start one primary source; start notification/OCR fallbacks only when primary probing fails. Running all sources together recreates duplicate delivery.
 
 Verify:
 
 - Compile the send driver and the message listener.
-- Run the echo-filter and baseline-recovery tests.
+- Run echo-filter, baseline-recovery, UIA-listener, and bubble-filter tests.
 - Live triage: in the dispatch log, read the self-vs-peer signal. Peer classified as self was missed → tune the self-detection threshold. Correctly a peer bubble → check for same-sentence punctuation replay (normalization) or scroll drift (suppress window).
 - Trade-off: lengthening the suppress window raises the risk of swallowing a *real* user message that lands inside it (it too is judged self). Do not lengthen it past the observed burst duration.
 
@@ -179,29 +182,95 @@ Symptoms:
 
 - A reply is generated but never reaches the chat app.
 - Failures cluster when a clipboard manager, browser, or IME is active, or when the chat window is minimized / moved off-screen.
+- The first segment sends, then every later segment reports that the main window is unavailable and is dropped.
 - All upper-layer retries fail the same way rather than one flaky attempt.
 
 Inspect:
 
 - The GUI-automation send driver: its clipboard save/restore/set helpers, every simulated-click call site, focus helpers, and coordinate math derived from the window rect.
+- The window manager and UIA listener: window discovery/activation, current-chat checks, target-chat search, and stale cache invalidation.
 - The persistent log file: search for the send failure traceback (see the crash-logging playbook).
 
 Two root causes:
 
 - **Clipboard contention.** Opening the OS clipboard with no retry throws an access-denied error when another process briefly holds it; a single send then fails outright.
 - **Automation fail-safe.** Click coordinates come from the window rect. A minimized / off-screen window yields garbage coords (screen corners, negatives); hitting a corner trips the automation library's fail-safe and crashes the whole send. The bad window state persists across all upper-layer retries, so every attempt dies identically.
+- **Stale window/chat cache.** The driver trusts a cached main window handle or "already in this chat" marker after the window closed, reopened, or drifted. Retrying the same stale state drops every remaining reply segment.
 
 Fix pattern:
 
 - Route all clipboard helpers through a small retry-with-backoff wrapper. The lock usually frees in tens of ms, so the send self-heals internally without escalating to the upper retry loop.
 - Never pass raw window-rect coords to the click primitive. Validate that the point is on a visible screen and not in a fail-safe corner, and wrap every click so it skips (returns failure) when out of bounds and catches the fail-safe exception. At critical focus points, return failure on invalid coords so the upper layer retries later (window may have recovered) instead of crashing.
+- Before reusing the current-chat cache, ask the active listener whether the expected chat is still open. On mismatch or invalid handle, clear the cache, rediscover/activate the main window, reopen the target, and only then send.
+- Propagate failure to the active send flow. Do not log success, advance/delete queued state, or keep dropping later segments after a send failure.
 - Do **not** disable the global automation fail-safe (that removes the human emergency stop), do not switch to a different send path just to dodge this, and do not add another outer retry loop — the principle is "make one attempt less likely to fail," not "stack more retries."
 
 Verify:
 
 - Compile the send driver.
-- Run the send-resilience tests (clipboard retry success / all-fail / self-heal; coordinate bounds; out-of-bounds no-click; on-screen click; fail-safe capture).
+- Run send-resilience and UIA-listener tests (clipboard retry success / all-fail / self-heal; coordinate bounds; stale chat invalidation; focus/search failure).
 - Test isolation gotcha: if other test files import the driver with the real automation library first, monkeypatch the library's click/size inside each test rather than relying on a self-installed stub's private attributes.
+
+## Provider And Model Do Not Match
+
+Symptoms:
+
+- The API says a model is unsupported for the current endpoint.
+- An image backend returns a deterministic 400 for parameters another backend accepts.
+- The same 400 is retried several times with the same model, URL, key, and payload.
+- Saving a masked key breaks only one model slot or silently reuses another provider's key.
+
+Inspect:
+
+- Config and editor: each slot's base URL, API-key field, model id, provider id, and fallback order.
+- Runtime selection: retry classification and fallback behavior.
+- Model catalog: discovery/edit metadata versus actual runtime slot wiring.
+- Provider adapters: provider-specific request schema and normalized result.
+
+Root cause:
+
+- Model id, endpoint, credential, and provider schema were edited as independent strings even though they are one runtime tuple. Retrying an incompatible tuple cannot heal it.
+
+Fix pattern:
+
+- Keep base URL, key, model id, capabilities, and fallback order together per slot.
+- Treat model-not-found, unsupported-model, endpoint, and invalid-parameter 400/404 responses as deterministic for that tuple. Move to a configured fallback or return a clear in-flow failure; do not retry the same tuple.
+- Keep provider-specific parameters in the provider adapter and normalize only at the contract boundary.
+- Resolve a masked key from the explicitly named saved field; never persist the mask or borrow another slot's secret.
+
+Verify:
+
+- Run model-management and provider-backend tests.
+- Exercise one valid and one deliberately incompatible provider/model tuple; confirm the invalid tuple is attempted once and the fallback/result is visible.
+
+## Deferred Background Work Is Lost Or Stuck
+
+Symptoms:
+
+- A memory or summary job is postponed when a new message arrives, but never runs again.
+- The same work is queued multiple times.
+- Restart leaves an item forever in `processing`.
+- A failed handler deletes its work or retries with no error/attempt record.
+
+Inspect:
+
+- The producer and consumer: enqueue point, claim point, success/failure transitions.
+- The durable queue implementation.
+- Any in-memory sets/lists that claim to represent retryable work.
+
+Root cause:
+
+- Retryable work was represented as ephemeral process state, or removed before success was known. Interruptions and restarts then look like successful completion.
+
+Fix pattern:
+
+- Use the smallest durable queue already available (SQLite is enough): dedupe on enqueue, atomically claim the oldest pending/failed item, delete only after success, and record a bounded error plus attempt count on failure.
+- On startup, recover stale `processing` items to `pending`.
+- Treat "new message arrived; defer" as a retryable failure/status transition, not a terminal exception that loses the candidate.
+
+Verify:
+
+- Check dedupe, success deletion, failure retry, exception recording, and restart recovery.
 
 ## Generated Images Look "Too AI"
 
